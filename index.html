@@ -1,0 +1,214 @@
+<!-- Miigon 2020-12-14 ShenZhen University -->
+<head>
+    <meta charset="utf-8"/>
+    <script src="comsci_lzw.js"></script>
+    <style>
+        html {
+            color: white;
+            background-color: #222;
+        }
+        .code {
+            font-size: 13px;
+            color: white;
+            background-color: #222;
+            width: 700px;
+            height: 150px;
+            font-family: monospace;
+        }
+        .execute-button {
+            display: block;
+            font-size: 30px;
+            width: 400px;
+            height: 60px;
+        }
+        .red {
+            color: tomato;
+        }
+        .yellow {
+            color: gold;
+        }
+        .green {
+            color: lime;
+        }
+    </style>
+    <script>
+        function generateStyledHTMLForEncodingArray(arr){
+            const ELEMENT_PER_LINE = 25;
+            let output = [];
+            for(let i=0;i<arr.length / ELEMENT_PER_LINE;i++)
+            {
+                const elementCount = Math.min(ELEMENT_PER_LINE, arr.length - i * ELEMENT_PER_LINE)
+                for(let j=0;j<elementCount;j++){
+                    let code = arr[i*ELEMENT_PER_LINE+j];
+                    let color = "";
+                    if(code >= 256) color = "yellow";
+                    output.push(`<span class="${color}">`);
+                    if(code >= 256) output.push("["+(code-256)+"]");
+                    else output.push(code);
+                    output.push("</span>");
+
+                }
+                output.push("<br/>");
+            }
+            return output.join('');
+        }
+        function generateStyledHTMLForDictionary(dict){
+            const ELEMENT_PER_LINE = 10;
+            let output = [];
+            let reversedDict = [];
+            for(let k in dict) {
+                if(!dict.hasOwnProperty(k)) continue;
+                let code = dict[k];
+                if(code < 256) continue;
+                reversedDict[code-256] = k;
+            }
+            for(let i=0;i<reversedDict.length / ELEMENT_PER_LINE;i++)
+            {
+                const elementCount = Math.min(ELEMENT_PER_LINE, reversedDict.length - i * ELEMENT_PER_LINE)
+                for(let j=0;j<elementCount;j++){
+                    let code = i*ELEMENT_PER_LINE+j;
+                    let data = reversedDict[i*ELEMENT_PER_LINE+j];
+                    let color = "";
+                    if(code >= 256) color = "yellow";
+                    output.push("<span class='yellow'>[");
+                    output.push(code);
+                    output.push("]:</span> ");
+                    output.push("<span class='green'>");
+                    output.push(data);
+                    output.push("</span>, ");
+
+                }
+                output.push("<br/>");
+            }
+            return output.join('');
+        }
+        function generateStyledHTMLForCompressionResult(arr){
+            const ELEMENT_PER_LINE = 25;
+            let output = [];
+            for(let i=0;i<arr.length / ELEMENT_PER_LINE;i++)
+            {
+                const elementCount = Math.min(ELEMENT_PER_LINE, arr.length - i * ELEMENT_PER_LINE)
+                for(let j=0;j<elementCount;j++){
+                    let code = arr[i*ELEMENT_PER_LINE+j];
+                    let color = "";
+                    if(code >= 256) color = "yellow";
+                    output.push(`<span class="yellow">`);
+                    output.push(code < 16 ? '0' : '');
+                    output.push(code.toString(16).toUpperCase());
+                    output.push("</span>, ");
+
+                }
+                output.push("<br/>");
+            }
+            return output.join('');
+        }
+
+        function clickCompress(){
+            let inputData = document.getElementById("input-data").value;
+            let [encodingArray,dict] = lzwCompress(inputData);
+
+            document.getElementById("compressed-bytearray-data").innerHTML = generateStyledHTMLForEncodingArray(encodingArray);
+            document.getElementById("dictionary-data").innerHTML = generateStyledHTMLForDictionary(dict);
+            let byteArray = getByteArrayFromEncodingArray(encodingArray);
+            document.getElementById("compressed-data").innerHTML = generateStyledHTMLForCompressionResult(byteArray);
+            const preLength = _stringToUtf8(inputData).length;
+            const postLength = byteArray.length;
+            document.getElementById("pre-len").innerHTML = preLength;
+            document.getElementById("post-len").innerHTML = postLength;
+            document.getElementById("comp-rate").innerHTML = 
+                `<span class="${postLength > preLength ? "red" : "green" }">` +
+                (postLength / preLength * 100).toFixed(2) + "%" +
+                "</span>";
+        }
+        function clickDecompress(){
+            let inputData = document.getElementById("input-data").value;
+            let [encodingArray] = lzwCompress(inputData);
+            console.log(encodingArray)
+            document.getElementById("output").innerText = lzwDecompress(encodingArray);
+        }
+        function clickExample(i){
+            let codes = [
+`ShenZhen University is a University in ShenZhen`,
+`repeat repeat repeat repeat repeat repeat repeat repeat repeat 
+repeat repeat repeat repeat repeat repeat repeat repeat repeat `,
+`To be, or not to be, that is the question:
+Whether 'tis nobler in the mind to suffer
+The slings and arrows of outrageous fortune,
+Or to take arms against a sea of troubles
+And by opposing end them. To die—to sleep,
+No more; and by a sleep to say we end
+The heart-ache and the thousand natural shocks
+That flesh is heir to: 'tis a consummation`,
+`Here's to the crazy ones.The misfits. The rebels. The troublemakers.
+The round pegs in the square holes. The ones who see things differently.
+They're not fond of rules. And they have no respect for the status quo.
+You can quote them, disagree with them, glorify or vilify them.
+About the only thing you can't do is ignore them. Because they change things.
+They push the human race forward.
+And while some may see them as the crazy ones, we see genius.
+Because the people who are crazy enough to think they can change the world,
+are the ones who do.`,
+`I love ShenZhen Uni!`,
+`中文的压缩效果比英文差一些，比起英文，中文的重复没有英文那么多，不利于压缩效果`,
+            ]
+            document.getElementById("input-data").value = codes[i];
+            clickCompress();
+        }
+
+    </script>
+</head>
+<body>
+    <code><pre>
+// javascript implementation of LZW compression algorithm
+// Author: Miigon 2020-12-14 ShenZhen University
+
+A 512-entry dictionary is used. Whenever the dictionary is full,
+it resets back to the 512-entry default dictionary.
+
+References:
+https://www2.cs.duke.edu/csed/curious/compression/lzw.html
+https://cs.carleton.edu/faculty/jondich/courses/cs337_w02/assignments/lzw.html
+http://www.cs.columbia.edu/~allen/S14/NOTES/lzw.pdf
+https://github.com/SteCicero/lz78
+
+Also See:
+https://www.researchgate.net/publication/265661965_A_Comparative_Study_Of_Text_Compression_Algorithms
+      
+    </pre>
+    </code>
+    <p>
+        Examples:
+        <button class="example-button" onclick="clickExample(0)">1.SZU</button>
+        <button class="example-button" onclick="clickExample(1)">2.easily compressed</button>
+        <button class="example-button" onclick="clickExample(2)">3.To be or not to be</button>
+        <button class="example-button" onclick="clickExample(3)">4.Think Different</button>
+        <button class="example-button" onclick="clickExample(4)">5.compression rate of over 100%</button>
+        <button class="example-button" onclick="clickExample(5)">6.chinese</button>
+    </p>
+    <textarea class="code" id="input-data" autocorrect="off" oninput="clickCompress()"></textarea>
+    <div>
+        <p>
+            How was the input indexed:<br/>
+            <code id="compressed-bytearray-data"></code>
+        </p>
+        <p>
+            Dictionary:<br/>
+            <code id="dictionary-data"></code>
+        </p>
+        <p>
+            Compression result:<br/>
+            <code id="compressed-data"></code>
+        </p>
+        <p>
+            Pre-compression: <code class="yellow" id="pre-len"></code> bytes<br/>
+            Post-compression: <code class="yellow" id="post-len"></code> bytes<br/>
+            Compression rate: <code id="comp-rate"></code><br/>
+        </p>
+
+    </div>
+    <p>
+        <button class="execute-button" onclick="clickDecompress()">Decompress</button>
+    </p>
+    <p>Output:</p>
+    <textarea class="code" id="output" readonly autocorrect="off"></textarea>
+</body>
