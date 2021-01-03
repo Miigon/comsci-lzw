@@ -88,7 +88,7 @@ function lzwDecompress(encodingArray) {
 
 // Convert an encoding array (with some 'bytes' being over 255)
 // to a conventional byte array (all bytes within 0 to 255)
-// WARNING: the code below is a VERY INEFFICIENT way to do it.
+// WARNING: the following code is a VERY INEFFICIENT way of doing it.
 function getByteArrayFromEncodingArray(encodingArray) {
     return convertEncodingArrayUnitLength(encodingArray, BITS_PER_ENCODING, 8, false);
 }
@@ -101,37 +101,24 @@ function convertEncodingArrayUnitLength(encodingArray, originalUnitLength, targe
     let binaryFormArr = [];
     for(let k of encodingArray) {
         let ch = typeof(k) == "string" ? k.charCodeAt(0) : k;
-        let binArr = [];
-        while(ch){
-            binArr.push(ch % 2);
-            ch >>= 1;
-        }
-        binaryFormArr.push('0'.repeat(originalUnitLength - binArr.length) + binArr.reverse().join(''))
+        binaryFormArr.push('0'.repeat(originalUnitLength - ch.toString(2).length) + ch.toString(2))
     }
     let binaryForm = binaryFormArr.join('');
 
     let output = [];
     for(let i=0;i<binaryForm.length;i+=targetUnitLength){
         let byteBinary = binaryForm.substr(i,targetUnitLength)
-        let out = 0;
         if(discardIncompleteUnit && byteBinary.length < targetUnitLength) {continue;}
-        for(let j=0;j<targetUnitLength;j++) {
-            out <<= 1;
-            let bit = byteBinary[j];
-            if(bit == '1'){
-                out += 1;
-            }
-        }
-        output.push(out);
+        output.push(parseInt(byteBinary + '0'.repeat(targetUnitLength - byteBinary.length),2));
     }
     return output;
 }
 
 
 function demoForNodeJs() {
-    // const TEXT = "the lz78 compression algorithm compresses text to be in a compressed form so the compressed text can take up less space than the uncompressed text";
+    const TEXT = "the lz78 compression algorithm compresses text to be in a compressed form so the compressed text can take up less space than the uncompressed text";
     // const TEXT = "repeat repeat repeat repeat repeat repeat";
-    const TEXT = "fffffffffffff";
+    // const TEXT = "ffffffffffffff";
     
     console.log("--------------------------------------")
     console.log("original text:\t", TEXT);
@@ -140,15 +127,17 @@ function demoForNodeJs() {
     // Compression
     let [compressResultEncodingArray] = lzwCompress(TEXT);
     let compressResult = getByteArrayFromEncodingArray(compressResultEncodingArray);
-    console.log("compressed:", compressResult);
-    console.log("pre-compression: ",_stringToUtf8(TEXT).length);
-    console.log("post-compression: ",compressResult.length);
-    console.log("compression rate: ", (compressResult.length / _stringToUtf8(TEXT).length * 100).toFixed(2), "%");
+    console.log("compressed:", compressResult); // [ 51, 64, 32, 48, 40, 1 ]
+    console.log("pre-compression: ",_stringToUtf8(TEXT).length); // 13
+    console.log("post-compression: ",compressResult.length); // 6
+    console.log("compression rate: ", (compressResult.length / _stringToUtf8(TEXT).length * 100).toFixed(2), "%"); // 46.15 %
     
     // Decompression
     let encodingArray = getEncodingArrayFromByteArray(compressResult);
+    let decompressed = lzwDecompress(encodingArray);
     console.log("--------------------------------------")
-    console.log("decompressed:\t", lzwDecompress(encodingArray));
+    console.log("decompressed:\t", decompressed); // ffffffffffff
+    console.log("orig == decomp:\t", decompressed === TEXT); // true
     console.log("--------------------------------------")
 }
 
